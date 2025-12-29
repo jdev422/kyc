@@ -20,6 +20,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { LoadingOverlay } from "./loading-overlay";
 import { validateIdentity } from "./identity-validation";
 import { isPrimaryIdentityDocType } from "@/lib/kyc/id-doc-types";
+import { kycRequest } from "@/lib/kyc/kyc-api";
 
 type ParsedAddress =
   | {
@@ -140,18 +141,17 @@ export function KycFlow() {
     setLoadingMessage("Registering applicant...");
 
     try {
-      const response = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(identity),
-      });
-      const payload = await response.json();
+      const data = await kycRequest<{ applicantId: string }>(
+        "/register",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(identity),
+        },
+        "Unable to register applicant."
+      );
 
-      if (!response.ok || payload.error) {
-        throw new Error(payload?.error?.message || "Unable to register applicant.");
-      }
-
-      setApplicantId(payload.data.applicantId);
+      setApplicantId(data.applicantId);
       setCurrentStep("selfie");
     } catch (error) {
       setIdentityError(
@@ -182,12 +182,11 @@ export function KycFlow() {
       body.append("applicantId", applicantId);
       if (selfieFile) body.append("selfie", selfieFile);
 
-      const response = await fetch("/api/selfie", { method: "POST", body });
-      const payload = await response.json();
-
-      if (!response.ok || payload.error) {
-        throw new Error(payload?.error?.message || "Selfie upload failed.");
-      }
+      await kycRequest<{ status: string }>(
+        "/selfie",
+        { method: "POST", body },
+        "Selfie upload failed."
+      );
 
       setCurrentStep("id-docs");
     } catch (error) {
@@ -237,12 +236,11 @@ export function KycFlow() {
         if (doc.backFile) body.append(`back_${index}`, doc.backFile);
       });
 
-      const response = await fetch("/api/id-docs", { method: "POST", body });
-      const payload = await response.json();
-
-      if (!response.ok || payload.error) {
-        throw new Error(payload?.error?.message || "ID upload failed.");
-      }
+      await kycRequest<{ status: string }>(
+        "/id-docs",
+        { method: "POST", body },
+        "ID upload failed."
+      );
 
       setCurrentStep("address");
     } catch (error) {
@@ -276,19 +274,24 @@ export function KycFlow() {
       body.append("country", addressMeta.country);
       body.append("issueDate", addressMeta.issueDate);
 
-      const response = await fetch("/api/address", { method: "POST", body });
-      const payload = await response.json();
+      const data = await kycRequest<{
+        status: string;
+        parsedAddress?: Omit<NonNullable<ParsedAddress>, "issuer">;
+        issuer?: string;
+      }>(
+        "/address",
+        { method: "POST", body },
+        "Proof-of-address upload failed."
+      );
 
-      if (!response.ok || payload.error) {
-        throw new Error(
-          payload?.error?.message || "Proof-of-address upload failed."
-        );
+      if (data.parsedAddress) {
+        setParsedAddress({
+          ...data.parsedAddress,
+          issuer: data.issuer ?? addressMeta.issuer,
+        });
+      } else {
+        setParsedAddress(null);
       }
-
-      setParsedAddress({
-        ...payload.data.parsedAddress,
-        issuer: payload.data.issuer,
-      });
       setCurrentStep("success");
       setConfirmOpen(false);
     } catch (error) {

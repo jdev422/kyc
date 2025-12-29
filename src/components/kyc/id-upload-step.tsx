@@ -26,6 +26,31 @@ export function IdUploadStep({ documents, error, onChange }: Props) {
     doc1Back: false,
   });
 
+  const [fileTypeErrors, setFileTypeErrors] = useState({
+    doc0Front: null as string | null,
+    doc0Back: null as string | null,
+    doc1Front: null as string | null,
+    doc1Back: null as string | null,
+  });
+
+  const acceptedIdImages = "image/jpeg,image/png,.jpg,.jpeg,.png" as const;
+
+  const validateIdImage = (file: File) => {
+    const type = (file.type ?? "").toLowerCase();
+    if (type === "image/jpeg" || type === "image/png") return null;
+
+    const name = (file.name ?? "").toLowerCase();
+    if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")) {
+      return null;
+    }
+
+    if (type === "image/heic" || name.endsWith(".heic")) {
+      return "HEIC is not supported. Please upload JPG or PNG.";
+    }
+
+    return "Accepted formats only: JPG, PNG.";
+  };
+
   const touch = (index: 0 | 1, field: "Type" | "Front" | "Back") => {
     setTouched((prev) => {
       if (index === 0 && field === "Type") return { ...prev, doc0Type: true };
@@ -65,7 +90,10 @@ export function IdUploadStep({ documents, error, onChange }: Props) {
         <h2 className="text-xl font-semibold text-white">Upload your ID</h2>
         <p className="text-sm text-[var(--text-muted)]">
           Upload two identity document types. Each must include front and back
-          images (e.g., passport + ID card).           Please take a clear photo of your image with all four corners visible.
+          images (e.g., passport + ID card).
+        </p>
+        <p className="text-sm text-[var(--text-muted)]">
+          Please take a clear photo of your image with all four corners visible.
           Make sure the details are readable, with no glare, blur, or cropping.
         </p>
       </header>
@@ -74,28 +102,74 @@ export function IdUploadStep({ documents, error, onChange }: Props) {
         <DocumentField
           label="Document 1"
           value={documents[0]}
+          accepted={acceptedIdImages}
           touched={{
             docType: touched.doc0Type,
             front: touched.doc0Front,
             back: touched.doc0Back,
           }}
+          fileTypeErrors={{
+            front: fileTypeErrors.doc0Front,
+            back: fileTypeErrors.doc0Back,
+          }}
           onTouch={(field) => touch(0, field)}
           onDocTypeChange={(value) => updateDoc(0, { docType: value })}
-          onFrontChange={(file) => updateDoc(0, { frontFile: file })}
-          onBackChange={(file) => updateDoc(0, { backFile: file })}
+          onFrontChange={(file) => {
+            if (!file) {
+              setFileTypeErrors((prev) => ({ ...prev, doc0Front: null }));
+              updateDoc(0, { frontFile: null });
+              return;
+            }
+            const nextError = validateIdImage(file);
+            setFileTypeErrors((prev) => ({ ...prev, doc0Front: nextError }));
+            updateDoc(0, { frontFile: nextError ? null : file });
+          }}
+          onBackChange={(file) => {
+            if (!file) {
+              setFileTypeErrors((prev) => ({ ...prev, doc0Back: null }));
+              updateDoc(0, { backFile: null });
+              return;
+            }
+            const nextError = validateIdImage(file);
+            setFileTypeErrors((prev) => ({ ...prev, doc0Back: nextError }));
+            updateDoc(0, { backFile: nextError ? null : file });
+          }}
         />
         <DocumentField
           label="Document 2"
           value={documents[1]}
+          accepted={acceptedIdImages}
           touched={{
             docType: touched.doc1Type,
             front: touched.doc1Front,
             back: touched.doc1Back,
           }}
+          fileTypeErrors={{
+            front: fileTypeErrors.doc1Front,
+            back: fileTypeErrors.doc1Back,
+          }}
           onTouch={(field) => touch(1, field)}
           onDocTypeChange={(value) => updateDoc(1, { docType: value })}
-          onFrontChange={(file) => updateDoc(1, { frontFile: file })}
-          onBackChange={(file) => updateDoc(1, { backFile: file })}
+          onFrontChange={(file) => {
+            if (!file) {
+              setFileTypeErrors((prev) => ({ ...prev, doc1Front: null }));
+              updateDoc(1, { frontFile: null });
+              return;
+            }
+            const nextError = validateIdImage(file);
+            setFileTypeErrors((prev) => ({ ...prev, doc1Front: nextError }));
+            updateDoc(1, { frontFile: nextError ? null : file });
+          }}
+          onBackChange={(file) => {
+            if (!file) {
+              setFileTypeErrors((prev) => ({ ...prev, doc1Back: null }));
+              updateDoc(1, { backFile: null });
+              return;
+            }
+            const nextError = validateIdImage(file);
+            setFileTypeErrors((prev) => ({ ...prev, doc1Back: nextError }));
+            updateDoc(1, { backFile: nextError ? null : file });
+          }}
         />
       </div>
 
@@ -120,7 +194,9 @@ export function IdUploadStep({ documents, error, onChange }: Props) {
 function DocumentField({
   label,
   value,
+  accepted,
   touched,
+  fileTypeErrors,
   onTouch,
   onDocTypeChange,
   onFrontChange,
@@ -128,7 +204,9 @@ function DocumentField({
 }: {
   label: string;
   value: IdDocumentDraft;
+  accepted: string;
   touched: { docType: boolean; front: boolean; back: boolean };
+  fileTypeErrors: { front: string | null; back: string | null };
   onTouch: (field: "Type" | "Front" | "Back") => void;
   onDocTypeChange: (value: string) => void;
   onFrontChange: (file: File | null) => void;
@@ -184,7 +262,8 @@ function DocumentField({
             label="Front"
             file={value.frontFile}
             previewUrl={frontPreviewUrl}
-            error={frontError}
+            error={fileTypeErrors.front ?? frontError}
+            accept={accepted}
             onChange={(file) => {
               onTouch("Front");
               onFrontChange(file);
@@ -194,7 +273,8 @@ function DocumentField({
             label="Back"
             file={value.backFile}
             previewUrl={backPreviewUrl}
-            error={backError}
+            error={fileTypeErrors.back ?? backError}
+            accept={accepted}
             onChange={(file) => {
               onTouch("Back");
               onBackChange(file);
@@ -211,12 +291,14 @@ function UploadCard({
   file,
   previewUrl,
   error,
+  accept,
   onChange,
 }: {
   label: string;
   file: File | null;
   previewUrl: string | null;
   error: string | null;
+  accept: string;
   onChange: (file: File | null) => void;
 }) {
   return (
@@ -230,7 +312,7 @@ function UploadCard({
         </div>
         <input
           type="file"
-          accept="image/*"
+          accept={accept}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           onChange={(event) => onChange(event.target.files?.[0] ?? null)}
         />
