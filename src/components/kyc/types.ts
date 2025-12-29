@@ -9,11 +9,18 @@ export type StepDefinition = {
 };
 
 export type IdentityForm = {
+  firstName: string;
+  middleName: string;
+  lastName: string;
   email: string;
   phone: string;
-  firstName: string;
-  lastName: string;
+  dob: string;
   gender: string;
+  addressStreet: string;
+  addressCity: string;
+  addressRegion: string;
+  addressPostalCode: string;
+  addressCountry: string;
 };
 
 export type AddressMeta = {
@@ -24,11 +31,18 @@ export type AddressMeta = {
 };
 
 export const IDENTITY_TEMPLATE: IdentityForm = {
+  firstName: "",
+  middleName: "",
+  lastName: "",
   email: "",
   phone: "",
-  firstName: "",
-  lastName: "",
+  dob: "",
   gender: "",
+  addressStreet: "",
+  addressCity: "",
+  addressRegion: "",
+  addressPostalCode: "",
+  addressCountry: "",
 };
 
 export const ADDRESS_TEMPLATE: AddressMeta = {

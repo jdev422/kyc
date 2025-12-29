@@ -18,6 +18,7 @@ import { AddressStep } from "./address-step";
 import { SuccessStep } from "./success-step";
 import { ConfirmDialog } from "./confirm-dialog";
 import { LoadingOverlay } from "./loading-overlay";
+import { validateIdentity } from "./identity-validation";
 
 type ParsedAddress =
   | {
@@ -60,16 +61,14 @@ export function KycFlow() {
     [currentStep]
   );
 
-  const identityValid = useMemo(
-    () =>
-      Boolean(
-        identity.email &&
-        identity.phone &&
-        identity.firstName &&
-        identity.lastName &&
-        identity.gender
-      ),
+  const identityFieldErrors = useMemo(
+    () => validateIdentity(identity),
     [identity]
+  );
+
+  const identityValid = useMemo(
+    () => Object.keys(identityFieldErrors).length === 0,
+    [identityFieldErrors]
   );
 
   const selfieValid = useMemo(() => {
@@ -123,6 +122,12 @@ export function KycFlow() {
     setter(file);
 
   const submitIdentity = useCallback(async () => {
+    const errors = validateIdentity(identity);
+    if (Object.keys(errors).length) {
+      setIdentityError("Please complete the required identity fields.");
+      return;
+    }
+
     setIdentityError(null);
     setIsLoading(true);
     setLoadingMessage("Registering applicant...");
@@ -359,6 +364,7 @@ export function KycFlow() {
               <IdentityStep
                 value={identity}
                 error={identityError}
+                fieldErrors={identityFieldErrors}
                 onChange={setIdentity}
               />
             )}

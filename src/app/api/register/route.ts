@@ -4,9 +4,19 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const missing = ["email", "phone", "firstName", "lastName", "gender"].filter(
-    (field) => !body?.[field]
-  );
+  const missing = [
+    "email",
+    "phone",
+    "firstName",
+    "lastName",
+    "dob",
+    "gender",
+    "addressStreet",
+    "addressCity",
+    "addressRegion",
+    "addressPostalCode",
+    "addressCountry",
+  ].filter((field) => !body?.[field]);
 
   if (missing.length) {
     return NextResponse.json(

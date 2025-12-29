@@ -1,6 +1,7 @@
 "use client";
 
 import { IdentityForm, AddressMeta } from "./types";
+import { formatFullName, formatPhysicalAddress } from "./identity-validation";
 
 type Props = {
   identity: IdentityForm;
@@ -26,10 +27,9 @@ export function ConfirmDialog({
         <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-sm text-[var(--text-muted)]">
           <Row label="Email" value={identity.email} />
           <Row label="Phone" value={identity.phone} />
-          <Row
-            label="Name"
-            value={`${identity.firstName} ${identity.lastName}`.trim()}
-          />
+          <Row label="Name" value={formatFullName(identity)} />
+          <Row label="Date of birth" value={identity.dob} />
+          <Row label="Physical address" value={formatPhysicalAddress(identity)} />
           <Row label="Document type" value={addressMeta.docType || "—"} />
           <Row label="Issuer" value={addressMeta.issuer || "—"} />
         </div>
