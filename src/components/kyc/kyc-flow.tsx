@@ -13,12 +13,13 @@ import {
 import { Stepper } from "./stepper";
 import { IdentityStep } from "./identity-step";
 import { SelfieStep } from "./selfie-step";
-import { IdUploadStep } from "./id-upload-step";
+import { IdUploadStep, type IdDocumentDraft } from "./id-upload-step";
 import { AddressStep } from "./address-step";
 import { SuccessStep } from "./success-step";
 import { ConfirmDialog } from "./confirm-dialog";
 import { LoadingOverlay } from "./loading-overlay";
 import { validateIdentity } from "./identity-validation";
+import { isPrimaryIdentityDocType } from "@/lib/kyc/id-doc-types";
 
 type ParsedAddress =
   | {
@@ -39,9 +40,12 @@ export function KycFlow() {
   const [identityError, setIdentityError] = useState<string | null>(null);
 
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
-  const [idFrontFile, setIdFrontFile] = useState<File | null>(null);
-  const [idBackFile, setIdBackFile] = useState<File | null>(null);
-  const [passportFile, setPassportFile] = useState<File | null>(null);
+  const [idDocuments, setIdDocuments] = useState<
+    [IdDocumentDraft, IdDocumentDraft]
+  >([
+    { docType: "", frontFile: null, backFile: null },
+    { docType: "", frontFile: null, backFile: null },
+  ]);
   const [selfieError, setSelfieError] = useState<string | null>(null);
   const [idDocsError, setIdDocsError] = useState<string | null>(null);
   const [cameraChecked, setCameraChecked] = useState(false);
@@ -76,9 +80,12 @@ export function KycFlow() {
   }, [selfieFile]);
 
   const idDocsValid = useMemo(() => {
-    if (passportFile) return true;
-    return Boolean(idFrontFile && idBackFile);
-  }, [idFrontFile, idBackFile, passportFile]);
+    const completed = idDocuments.filter(
+      (doc) => doc.docType && doc.frontFile && doc.backFile
+    );
+    if (completed.length !== 2) return false;
+    return completed.some((doc) => isPrimaryIdentityDocType(doc.docType));
+  }, [idDocuments]);
 
   const addressValid = useMemo(
     () =>
@@ -198,7 +205,22 @@ export function KycFlow() {
       return;
     }
     if (!idDocsValid) {
-      setIdDocsError("Upload ID front/back or a passport.");
+      const completed = idDocuments.filter(
+        (doc) => doc.docType && doc.frontFile && doc.backFile
+      );
+      if (completed.length < 2) {
+        setIdDocsError(
+          "Upload front and back images for both documents and select document types."
+        );
+      } else if (!completed.some((doc) => isPrimaryIdentityDocType(doc.docType))) {
+        setIdDocsError(
+          "At least one uploaded document must be a passport, driver’s license, or identification card."
+        );
+      } else {
+        setIdDocsError(
+          "Upload front and back images for both documents and select document types."
+        );
+      }
       return;
     }
 
@@ -209,13 +231,11 @@ export function KycFlow() {
     try {
       const body = new FormData();
       body.append("applicantId", applicantId);
-      if (idFrontFile && idBackFile) {
-        body.append("idFront", idFrontFile);
-        body.append("idBack", idBackFile);
-      }
-      if (passportFile) {
-        body.append("passport", passportFile);
-      }
+      idDocuments.forEach((doc, index) => {
+        body.append(`docType_${index}`, doc.docType);
+        if (doc.frontFile) body.append(`front_${index}`, doc.frontFile);
+        if (doc.backFile) body.append(`back_${index}`, doc.backFile);
+      });
 
       const response = await fetch("/api/id-docs", { method: "POST", body });
       const payload = await response.json();
@@ -230,7 +250,7 @@ export function KycFlow() {
     } finally {
       setIsLoading(false);
     }
-  }, [applicantId, idDocsValid, idFrontFile, idBackFile, passportFile]);
+  }, [applicantId, idDocsValid, idDocuments]);
 
   const submitAddress = useCallback(async () => {
     if (!applicantId) {
@@ -315,9 +335,10 @@ export function KycFlow() {
     setIdentity(IDENTITY_TEMPLATE);
     setIdentityError(null);
     setSelfieFile(null);
-    setIdFrontFile(null);
-    setIdBackFile(null);
-    setPassportFile(null);
+    setIdDocuments([
+      { docType: "", frontFile: null, backFile: null },
+      { docType: "", frontFile: null, backFile: null },
+    ]);
     setSelfieError(null);
     setIdDocsError(null);
     setAddressDoc(null);
@@ -380,13 +401,9 @@ export function KycFlow() {
             )}
             {currentStep === "id-docs" && (
               <IdUploadStep
-                idFrontFile={idFrontFile}
-                idBackFile={idBackFile}
-                passportFile={passportFile}
+                documents={idDocuments}
                 error={idDocsError}
-                onFrontChange={setFile(setIdFrontFile)}
-                onBackChange={setFile(setIdBackFile)}
-                onPassportChange={setFile(setPassportFile)}
+                onChange={setIdDocuments}
               />
             )}
             {currentStep === "address" && (

@@ -40,9 +40,7 @@ export function SelfieStep({
   const [boundingBoxes, setBoundingBoxes] = useState<BoundingBox[]>([]);
   const [facesDetected, setFacesDetected] = useState(0);
   const [detected, setDetected] = useState(false);
-  const [autoCaptured, setAutoCaptured] = useState(false);
   const [loadingModel, setLoadingModel] = useState(false);
-
   const fileLabel = useMemo(
     () =>
       selfieFile
@@ -68,6 +66,10 @@ export function SelfieStep({
   }, [stopCamera, previewUrl]);
 
   const captureSelfie = useCallback(() => {
+    if (!detected) {
+      setCameraError("No face detected yet. Center your face and try again.");
+      return;
+    }
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     if (!video || !canvas) {
@@ -89,7 +91,6 @@ export function SelfieStep({
           type: "image/jpeg",
         });
         onSelfieChange(file);
-        setAutoCaptured(true);
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         const url = URL.createObjectURL(blob);
         setPreviewUrl(url);
@@ -97,7 +98,7 @@ export function SelfieStep({
       "image/jpeg",
       0.92
     );
-  }, [onSelfieChange, previewUrl]);
+  }, [detected, onSelfieChange, previewUrl]);
 
   const handleResults = useCallback((results: { detections?: Array<{ boundingBox: { xCenter: number; yCenter: number; width: number; height: number } }> }) => {
     const detections = results?.detections ?? [];
@@ -126,8 +127,10 @@ export function SelfieStep({
     }
 
     setCameraError(null);
-    setAutoCaptured(false);
     setLoadingModel(true);
+    setBoundingBoxes([]);
+    setFacesDetected(0);
+    setDetected(false);
 
     const startWhenReady = async () => {
       if (!videoRef.current) {
@@ -166,14 +169,6 @@ export function SelfieStep({
     requestAnimationFrame(startWhenReady);
   }, [handleResults]);
 
-  useEffect(() => {
-    if (showCamera && detected && !autoCaptured) {
-      const timeout = setTimeout(() => captureSelfie(), 300);
-      return () => clearTimeout(timeout);
-    }
-    return;
-  }, [showCamera, detected, autoCaptured, captureSelfie]);
-
   return (
     <div className="space-y-6 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6">
       <header className="space-y-2">
@@ -211,9 +206,9 @@ export function SelfieStep({
             onClick={startCamera}
             className="w-full rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:border-white/60"
           >
-            {loadingModel ? "Loading..." : "Take photo"}
+            {loadingModel ? "Loading..." : showCamera ? "Camera on" : "Start camera"}
           </button>
-          <div className={`space-y-4 ${showCamera ? "" : "hidden"}`} >
+          <div className={`space-y-4 ${showCamera ? "" : "hidden"}`}>
             <div
               className="relative w-full overflow-hidden rounded-2xl border border-black/40 bg-black"
               style={{ height: VIDEO_HEIGHT }}
@@ -239,18 +234,14 @@ export function SelfieStep({
               />
             </div>
 
-            <div className="flex flex-wrap gap-3 text-xs text-[var(--text-muted)]">
-              <StatusChip label="Face detected" value={detected ? "Yes" : "No"} />
-              <StatusChip label="Faces" value={facesDetected.toString()} />
-            </div>
-
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={captureSelfie}
-                className="flex-1 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
+                disabled={!detected}
+                className="flex-1 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-[var(--text-muted)]"
               >
-                Capture selfie
+                Capture Selfie
               </button>
               <button
                 type="button"
@@ -260,9 +251,14 @@ export function SelfieStep({
                 Close camera
               </button>
             </div>
+            {!detected && (
+              <p className="text-xs text-[var(--text-muted)]">
+                Align your face in the frame to enable capture.
+              </p>
+            )}
           </div>
 
-          {previewUrl && (
+          {!showCamera && previewUrl && (
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-black/30 p-3 text-center text-sm">
               <p className="mb-2 text-[var(--text-muted)]">Latest capture</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}

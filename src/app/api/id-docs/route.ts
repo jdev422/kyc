@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { isPrimaryIdentityDocType } from "@/lib/kyc/id-doc-types";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 const logsDir = path.join(process.cwd(), "logs");
@@ -29,28 +30,78 @@ async function writeLog(message: string, meta: Record<string, unknown>) {
 export async function POST(request: Request) {
   const formData = await request.formData();
   const applicantId = formData.get("applicantId");
-  const idFront = formData.get("idFront");
-  const idBack = formData.get("idBack");
-  const passport = formData.get("passport");
+  const documents: Array<{ docType: string; front: File; back: File }> = [];
 
-  const validIdPair =
-    idFront instanceof File && idBack instanceof File && idFront.size > 0 && idBack.size > 0;
-  const hasPassport = passport instanceof File && passport.size > 0;
-
-  if (!applicantId) {
+  if (typeof applicantId !== "string" || !applicantId) {
     return NextResponse.json(
       { data: null, error: { code: "INVALID_BODY", message: "Missing applicantId." } },
       { status: 400 }
     );
   }
 
-  if (!validIdPair && !hasPassport) {
+  for (let index = 0; index < 2; index += 1) {
+    const docTypeRaw =
+      formData.get(`docType_${index}`) ??
+      (index === 0 ? formData.get("docType") ?? formData.get("docType_0") : null);
+    const docType = typeof docTypeRaw === "string" ? docTypeRaw : "";
+
+    const front =
+      formData.get(`front_${index}`) ??
+      (index === 0 ? formData.get("idFront") ?? formData.get("front_0") : null);
+    const back =
+      formData.get(`back_${index}`) ??
+      (index === 0 ? formData.get("idBack") ?? formData.get("back_0") : null);
+
+    if (!docType.trim()) {
+      return NextResponse.json(
+        {
+          data: null,
+          error: {
+            code: "INVALID_BODY",
+            message: `Missing docType for document ${index + 1}.`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!(front instanceof File) || front.size <= 0) {
+      return NextResponse.json(
+        {
+          data: null,
+          error: {
+            code: "MISSING_DOCUMENT",
+            message: `Missing front image for document ${index + 1}.`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!(back instanceof File) || back.size <= 0) {
+      return NextResponse.json(
+        {
+          data: null,
+          error: {
+            code: "MISSING_DOCUMENT",
+            message: `Missing back image for document ${index + 1}.`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    documents.push({ docType, front, back });
+  }
+
+  if (!documents.some((doc) => isPrimaryIdentityDocType(doc.docType))) {
     return NextResponse.json(
       {
         data: null,
         error: {
-          code: "MISSING_DOCUMENT",
-          message: "Upload ID front/back or a passport.",
+          code: "MISSING_PRIMARY_ID",
+          message:
+            "At least one uploaded document must be a passport, driver’s license, or identification card.",
         },
       },
       { status: 400 }
@@ -60,15 +111,19 @@ export async function POST(request: Request) {
   try {
     await ensureDirs();
     const stored: string[] = [];
-    if (validIdPair && idFront instanceof File && idBack instanceof File) {
-      stored.push(await saveFile(`id-front-${applicantId}`, idFront));
-      stored.push(await saveFile(`id-back-${applicantId}`, idBack));
-    }
-    if (hasPassport && passport instanceof File) {
-      stored.push(await saveFile(`passport-${applicantId}`, passport));
+    for (const [index, doc] of documents.entries()) {
+      stored.push(await saveFile(`id-doc-${index}-front-${applicantId}`, doc.front));
+      stored.push(await saveFile(`id-doc-${index}-back-${applicantId}`, doc.back));
     }
 
-    await writeLog("id_docs_upload", { applicantId, stored, validIdPair, hasPassport });
+    await writeLog("id_docs_upload", {
+      applicantId,
+      stored,
+      documents: documents.map((doc) => ({
+        docType: doc.docType,
+        sizes: { front: doc.front.size, back: doc.back.size },
+      })),
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
