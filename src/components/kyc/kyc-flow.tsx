@@ -355,7 +355,7 @@ export function KycFlow() {
           <div>
             <p className="flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-[var(--text-muted)]">
               <Lock className="h-4 w-4 text-white" aria-hidden />
-              ApplyEase KYC
+              Webstacks KYC
             </p>
             <h1 className="text-2xl font-semibold text-white">
               Identity Verification

@@ -65,7 +65,8 @@ export function IdUploadStep({ documents, error, onChange }: Props) {
         <h2 className="text-xl font-semibold text-white">Upload your ID</h2>
         <p className="text-sm text-[var(--text-muted)]">
           Upload two identity document types. Each must include front and back
-          images (e.g., passport + ID card).
+          images (e.g., passport + ID card).           Please take a clear photo of your image with all four corners visible.
+          Make sure the details are readable, with no glare, blur, or cropping.
         </p>
       </header>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AddressMeta } from "./types";
 import { Upload } from "lucide-react";
 
@@ -18,6 +19,24 @@ export function AddressStep({
   onFileChange,
   onMetaChange,
 }: Props) {
+  const [localFileError, setLocalFileError] = useState<string | null>(null);
+
+  const accept = "application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png";
+
+  const isAcceptedFile = (candidate: File) => {
+    const type = candidate.type?.toLowerCase() ?? "";
+    if (type === "application/pdf") return true;
+    if (type === "image/jpeg") return true;
+    if (type === "image/png") return true;
+
+    const name = candidate.name?.toLowerCase() ?? "";
+    if (name.endsWith(".pdf")) return true;
+    if (name.endsWith(".jpg")) return true;
+    if (name.endsWith(".jpeg")) return true;
+    if (name.endsWith(".png")) return true;
+    return false;
+  };
+
   const update = (field: keyof AddressMeta, value: string) =>
     onMetaChange({ ...metadata, [field]: value });
 
@@ -35,8 +54,24 @@ export function AddressStep({
         <input
           type="file"
           className="hidden"
-          accept="image/*,.pdf"
-          onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+          accept={accept}
+          onChange={(event) => {
+            const nextFile = event.target.files?.[0] ?? null;
+            if (!nextFile) {
+              setLocalFileError(null);
+              onFileChange(null);
+              return;
+            }
+
+            if (!isAcceptedFile(nextFile)) {
+              setLocalFileError("Accepted formats only: PDF, JPG, PNG.");
+              onFileChange(null);
+              return;
+            }
+
+            setLocalFileError(null);
+            onFileChange(nextFile);
+          }}
         />
         <Upload className="mx-auto h-6 w-6 text-white" />
         <span className="font-medium text-white">Drop or browse document</span>
@@ -104,6 +139,12 @@ export function AddressStep({
           />
         </label>
       </div>
+
+      {localFileError && (
+        <p className="text-sm text-red-400" role="alert">
+          {localFileError}
+        </p>
+      )}
 
       {error && (
         <p className="text-sm text-red-400" role="alert">

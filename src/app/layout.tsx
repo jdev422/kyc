@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KYC Demo",
+  title: "Webstacks KYC",
   description:
     "Three-step Know Your Customer flow with identity basics, selfie capture, and proof of address.",
 };
